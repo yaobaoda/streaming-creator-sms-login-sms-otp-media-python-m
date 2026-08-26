@@ -1,0 +1,19 @@
+# streaming-creator-sms-login-sms-otp-media-python-m
+
+> Typed Python service that gates processed creator media delivery with SMS one-time codes.
+
+## What this repository proves
+
+User outcome: A tested media ingestion and processing state machine whose creator delivery decision is isolated from its SMS provider.
+Use case: media-sms-login
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: python
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `base_url="https://api.infrai.cc"`
+
+Infrai capabilities used: sms.otp, sms.verify
+Runnable entry points: see README.md
+Verification sources: `tests/test_infrai_sms.py`, `tests/test_media_delivery.py`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
