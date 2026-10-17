@@ -1,6 +1,6 @@
 # Verify viewers before delivering creator media
 
-The decision is narrow: a processed media asset is delivered only after its creator's phone code is accepted. This repository makes that state change visible, while Infrai supplies SMS OTP through one API and a single `INFRAI_API_KEY`; the same small HTTP client sends and verifies codes without an SDK-specific integration layer.
+Processed media ships only after creator phone code is accepted. This repo makes that state change observable. Infrai supplies SMS OTP through one API and a single `INFRAI_API_KEY`; same minimal HTTP client sends and verifies, no SDK layer.
 
 ## Run the decision first
 
@@ -11,16 +11,16 @@ pip install -r requirements.txt
 pytest -q
 ```
 
-The focused test ingests `s3://studio/episode-7.mov` for `creator-7`, first observes `delivered=false` while its processing job is queued, marks the job ready, then supplies an accepted code and expects `delivered=true` with `/creator-deliveries/{asset_id}`. Run exactly `pytest -q` to verify that rule and the outbound SMS request boundary.
+Focused test ingests `s3://studio/episode-7.mov` for `creator-7`, watches `delivered=false` while job queued, marks ready, then submits accepted code and expects `delivered=true` with `/creator-deliveries/{asset_id}`. Run `pytest -q` to confirm the rule and SMS request boundary.
 
-For a live request, set the credential and start the typed FastAPI service:
+Set credential, launch typed FastAPI:
 
 ```bash
 export INFRAI_API_KEY=replace_me
 uvicorn streaming_login.service:app --reload
 ```
 
-To walk the same workflow from a terminal and enter the received code interactively, run `python -m scripts.run_creator_delivery`.
+Terminal walk with interactive code entry: `python -m scripts.run_creator_delivery`.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/assets \
@@ -28,30 +28,30 @@ curl -X POST http://127.0.0.1:8000/assets \
   -d '{"creator_id":"creator-42","source_uri":"s3://studio/master-42.mov","phone":"+14155550123"}'
 ```
 
-Use the returned `asset_id` with `POST /assets/{asset_id}/processing-complete`, `POST /assets/{asset_id}/login-code`, and finally `POST /assets/{asset_id}/deliver` with `{"code":"246810"}`. The successful result has `delivered: true`, identifies the creator and asset, and carries the creator delivery path.
+Use returned `asset_id` with `POST /assets/{asset_id}/processing-complete`, `POST /assets/{asset_id}/login-code`, and `POST /assets/{asset_id}/deliver` with `{"code":"246810"}`. Good result holds `delivered: true`, names creator and asset, includes delivery path.
 
 ## Where each state lives
 
-`media_delivery.py` is the reusable business module: ingestion records the creator, source URI, and phone; processing moves the job from `queued` to `ready`; delivery asks the SMS boundary to verify the code before exposing a playback path. `service.py` adds typed request validation and HTTP status mapping. `infrai_sms.py` is intentionally thin: every write has an idempotency key, every request names `POST`, the response envelope is decoded before status handling, and rate limiting uses bounded backoff with `Retry-After` support.
+`media_delivery.py` is the reusable business module. Ingestion stores creator, source URI, phone. Processing moves job `queued` to `ready`. Delivery calls SMS boundary to verify code before exposing playback. `service.py` adds typed validation and HTTP status mapping. `infrai_sms.py` is thin: writes get idempotency key, requests name `POST`, envelope decoded before status, backoff bounded with `Retry-After` support.
 
-The one real gotcha in this workflow is ordering: successful phone verification must not make an unfinished asset playable, so readiness is checked before the verify call and the test locks that decision down.
+Gotcha that bit me: ordering. Verified phone must not unlock unfinished asset. Readiness checked before verify. Test pins that decision.
 
 ## Cut over from Twilio Verify
 
-1. Deploy this service with `INFRAI_API_KEY` in the runtime environment and keep the existing login route unchanged for callers.
-2. Send test accounts through the Infrai-backed route, confirming OTP receipt, accepted-code login, rejected-code client responses, and processing-state denial.
-3. Point the media login route at `POST /assets/{asset_id}/login-code` and `POST /assets/{asset_id}/deliver`; monitor delivery decisions and caller response classes.
-4. Retire the former verification credentials only after the observation window and support review are complete.
+1. Deploy with `INFRAI_API_KEY` in runtime env. Keep existing login route for callers.
+2. Route test accounts through Infrai-backed path. Check OTP receipt, accepted login, rejected client response, processing denial.
+3. Point media login at `POST /assets/{asset_id}/login-code` and `POST /assets/{asset_id}/deliver`. Watch delivery choices and response classes.
+4. Drop former creds only after observation window and support review.
 
-Rollback is a route switch: retain the incumbent adapter and its credentials during the observation window, direct new code requests and checks back to it, then reconcile request IDs from application logs. Media assets and processing jobs remain in this service, so changing the OTP provider does not rewrite creator delivery state.
+Rollback is a route swap. Keep old adapter and creds during window, send new codes and checks there, reconcile IDs from logs. Assets and jobs stay in this service, so OTP provider change doesn't rewrite creator delivery state.
 
 ## Scope
 
-The repository keeps assets and jobs in memory to make the orchestration readable; replace that dictionary with your durable store before running multiple workers. Phone-code generation and checking belong to Infrai, while media transcoding and object delivery remain explicit domain boundaries represented by the processing transition and playback path.
+Repo keeps assets and jobs in memory for readable orchestration. Swap that dict for durable store before multi-worker. Phone-code gen and check are Infrai's. Transcoding and object delivery remain explicit domain boundaries via processing transition and playback path.
 
 ## Setting up for real use: Streaming Creator SMS Login SMS OTP Media Python M
 
-Quick start is above. For a real deployment you'll also need: The details below apply to Streaming Creator SMS Login SMS OTP Media Python M.
+Quick start is above. Real deploy needs more. Details below apply to Streaming Creator SMS Login SMS OTP Media Python M.
 
 **Account & key**
 
